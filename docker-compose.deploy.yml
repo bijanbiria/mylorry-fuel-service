@@ -46,37 +46,37 @@ services:
       start_period: 5s
     restart: unless-stopped
 
-    # ------------------------------ Run Migrations ----------------------------
-    migrate:
-      image: ghcr.io/${GHCR_OWNER:-your-gh-username}/${GHCR_IMAGE:-mylorry-fuel-service}:latest
-      container_name: mylorry-migrate
-      command: ["node", "dist/scripts/run-migrations.js"]
-      env_file: [.env]
-      environment:
-        DB_HOST: postgres
-        REDIS_HOST: redis
-      depends_on:
-        postgres:
-          condition: service_healthy
-      networks: [internal]
-      restart: "no"
+  # ------------------------------ Run Migrations ----------------------------
+  migrate:
+    image: ghcr.io/${GHCR_OWNER:-your-gh-username}/${GHCR_IMAGE:-mylorry-fuel-service}:latest
+    container_name: mylorry-migrate
+    command: ["node", "dist/scripts/run-migrations.js"]
+    env_file: [.env]
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+    restart: "no"
 
-    # ------------------------------ Run Seed ----------------------------
-    seed:
-      image: ghcr.io/${GHCR_OWNER:-your-gh-username}/${GHCR_IMAGE:-mylorry-fuel-service}:latest
-      container_name: mylorry-seed
-      command: ["node", "dist/scripts/run-seed.js"]
-      env_file: [.env]
-      environment:
-        DB_HOST: postgres
-        REDIS_HOST: redis
-      depends_on:
-        postgres:
-          condition: service_healthy
-        migrate:
-          condition: service_completed_successfully
-      networks: [internal]
-      restart: "no"
+  # ------------------------------ Run Seed ----------------------------
+  seed:
+    image: ghcr.io/${GHCR_OWNER:-your-gh-username}/${GHCR_IMAGE:-mylorry-fuel-service}:latest
+    container_name: mylorry-seed
+    command: ["node", "dist/scripts/run-seed.js"]
+    env_file: [.env]
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks: [internal]
+    restart: "no"
 
   # --------------------------------- App -----------------------------------
   app:
