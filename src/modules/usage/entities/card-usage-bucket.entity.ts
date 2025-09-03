@@ -1,4 +1,4 @@
-import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn, JoinColumn } from 'typeorm';
 import { Card } from '../../cards/entities/card.entity';
 
 @Entity({ name: 'card_usage_buckets' })
@@ -18,6 +18,7 @@ export class CardUsageBucket {
    * Card for which usage is tracked.
    */
   @ManyToOne(() => Card, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'card_id' })
   card: Card;
 
   /**

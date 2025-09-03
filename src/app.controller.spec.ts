@@ -1,3 +1,9 @@
+/**
+ * Unit tests for AppController
+ *
+ * Verifies the root handler delegates to AppService and returns the expected
+ * message. Keeps the test lightweight and focused on controller behavior.
+ */
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -15,8 +21,10 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return the fun root message', () => {
+      expect(appController.getHello()).toBe(
+        '👀 Hey there, curious explorer! This is the MyLorry Fuel Service API. Nothing to see here on the root – check the docs instead 😉'
+      );
     });
   });
 });

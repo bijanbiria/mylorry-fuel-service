@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, ManyToOne, PrimaryColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, ManyToOne, PrimaryColumn, JoinColumn } from 'typeorm';
 import { Card } from '../../cards/entities/card.entity';
 import { Organization } from '../../organizations/entities/organization.entity';
 import { Station } from '../../stations/entities/station.entity';
@@ -28,6 +28,7 @@ export class FuelTransaction {
    * Related card used for the transaction.
    */
   @ManyToOne(() => Card, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'card_id' })
   card: Card;
 
   /**
@@ -40,6 +41,7 @@ export class FuelTransaction {
    * Organization that owns the card/transaction.
    */
   @ManyToOne(() => Organization, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'organization_id' })
   organization: Organization;
 
   /**
@@ -52,6 +54,7 @@ export class FuelTransaction {
    * Station where the transaction occurred (nullable).
    */
   @ManyToOne(() => Station, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'station_id' })
   station: Station;
 
   /**

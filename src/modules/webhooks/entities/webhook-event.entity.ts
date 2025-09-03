@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, Unique, JoinColumn } from 'typeorm';
 import { Station } from '../../stations/entities/station.entity';
 
 @Entity({ name: 'webhook_events' })
@@ -18,6 +18,7 @@ export class WebhookEvent {
    * Originating station for the webhook (nullable).
    */
   @ManyToOne(() => Station, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'station_id' })
   station: Station;
 
   /**

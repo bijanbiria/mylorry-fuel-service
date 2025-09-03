@@ -3,13 +3,21 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './infra/database/database.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
 
+/**
+ * AppModule
+ *
+ * Composition root for the application. Loads global configuration, database
+ * connectivity, and feature modules. Keep cross-cutting providers here.
+ */
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}
