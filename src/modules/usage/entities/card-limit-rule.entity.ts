@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, ManyToOne, PrimaryGeneratedColumn, JoinColumn } from 'typeorm';
 import { Card } from '../../cards/entities/card.entity';
 
 @Entity({ name: 'card_limit_rules' })
@@ -18,6 +18,7 @@ export class CardLimitRule {
    * Card to which this limit applies. Cascade on card deletion.
    */
   @ManyToOne(() => Card, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'card_id' })
   card: Card;
 
   /**

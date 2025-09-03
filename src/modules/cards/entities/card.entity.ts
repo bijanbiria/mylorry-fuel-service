@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, ManyToOne, PrimaryGeneratedColumn, JoinColumn } from 'typeorm';
 import { Organization } from '../../organizations/entities/organization.entity';
 
 @Entity({ name: 'cards' })
@@ -19,6 +19,7 @@ export class Card {
    * Owning organization relation. Deleting an organization cascades to its cards.
    */
   @ManyToOne(() => Organization, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'organization_id' })
   organization: Organization;
 
   /**
