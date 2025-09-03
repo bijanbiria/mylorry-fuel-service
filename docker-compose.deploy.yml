@@ -70,10 +70,10 @@ services:
     #   - "${PORT:-3000}:3000"
     networks:
       - internal
-      - web
+      - traefik_public
     restart: unless-stopped
     labels:
-      # Traefik labels (assumes Traefik runs separately on the same `web` network)
+      # Traefik labels (assumes Traefik runs separately on the same `traefik_public` network)
       - "traefik.enable=true"
       - "traefik.http.routers.mylorry.rule=Host(`${DOMAIN:-mylorry.bijanbiria.com}`)"
       - "traefik.http.routers.mylorry.entrypoints=websecure"
@@ -83,8 +83,8 @@ services:
 # ------------------------------- Networks & Volumes -------------------------------
 networks:
   # Note: if Traefik runs in a separate stack/compose project,
-  # this network must be created as external: `docker network create web`
-  web:
+  # this network must be created as external: `docker network create traefik_public`
+  traefik_public:
     external: true
   internal:
     external: false
