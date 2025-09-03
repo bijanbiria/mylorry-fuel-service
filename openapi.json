@@ -1,0 +1,145 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1": {
+      "get": {
+        "operationId": "AppController_getHello",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/api/v1/webhooks/transactions": {
+      "post": {
+        "operationId": "WebhooksController_handleTx",
+        "parameters": [
+          {
+            "name": "x-idempotency-key",
+            "required": false,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncomingTransactionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          }
+        },
+        "summary": "Process incoming fuel transaction",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "MyLorry Fuel Service API",
+    "description": "Webhook + transactions processing for fuel cards",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [
+    {
+      "name": "webhooks",
+      "description": ""
+    }
+  ],
+  "servers": [],
+  "components": {
+    "schemas": {
+      "IncomingTransactionDto": {
+        "type": "object",
+        "properties": {
+          "stationCode": {
+            "type": "string",
+            "example": "STN-001",
+            "description": "Fuel station code"
+          },
+          "cardNumber": {
+            "type": "string",
+            "example": "4242424242424242",
+            "description": "Card PAN as received from the station. Service should hash/mask before lookup."
+          },
+          "amountCents": {
+            "type": "string",
+            "example": "10000",
+            "description": "Transaction amount in minor units (e.g., cents). Numeric string only."
+          },
+          "currency": {
+            "type": "string",
+            "example": "USD",
+            "description": "ISO currency code"
+          },
+          "occurredAt": {
+            "type": "string",
+            "example": "2025-09-03T10:00:00Z",
+            "description": "ISO-8601 timestamp when the transaction occurred"
+          },
+          "externalRef": {
+            "type": "string",
+            "example": "RRN-123456",
+            "description": "Optional external reference from the station/acquirer"
+          }
+        },
+        "required": [
+          "stationCode",
+          "cardNumber",
+          "amountCents",
+          "currency",
+          "occurredAt"
+        ]
+      },
+      "TransactionResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "approved",
+            "description": "Transaction status"
+          },
+          "transactionId": {
+            "type": "string",
+            "example": "d3c1f9b6-2f2a-42a9-9f0f-1f91a6f7465d",
+            "description": "Internal transaction ID (when approved)"
+          },
+          "reason": {
+            "type": "string",
+            "example": "Limit exceeded",
+            "description": "Reason for rejection (if applicable)"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    }
+  }
+}
