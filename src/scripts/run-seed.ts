@@ -1,14 +1,20 @@
 import 'dotenv/config';
 
+// Use CommonJS require so it works regardless of TS/ESM interop in the compiled output
+/* eslint-disable @typescript-eslint/no-var-requires */
 (async () => {
   try {
-    // Import without extension so TS types resolve to the TS module, while at runtime Node loads dist/scripts/seed.js
-    const mod = await import('./seed.js');
-
-    const run: unknown = (mod as any).default ?? (mod as any).seed ?? (typeof mod === 'function' ? (mod as any) : undefined);
+    const mod = require('./seed.js');
+    const run: unknown =
+      typeof mod === 'function'
+        ? mod
+        : (mod && (mod.default || (mod.seed as unknown))) || undefined;
 
     if (typeof run !== 'function') {
-      throw new Error('seed module does not export a callable function (default or named `seed`).');
+      const keys = mod ? Object.keys(mod) : [];
+      throw new Error(
+        `seed module does not export a callable function. Exported keys: [${keys.join(', ')}]`,
+      );
     }
 
     await (run as (...args: any[]) => Promise<unknown>)();
