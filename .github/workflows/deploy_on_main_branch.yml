@@ -14,9 +14,24 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: timescale/timescaledb:2.15.2-pg16
+        env:
+          POSTGRES_DB: mylorry
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d mylorry"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
     permissions:
       contents: read
       packages: write    # For push to GHCR
+      
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,10 +48,37 @@ jobs:
 
       - name: Install
         run: pnpm install --frozen-lockfile
+
+      - name: Wait for Postgres
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          until pg_isready -h localhost -p 5432 -U postgres -d mylorry; do
+            echo "⏳ waiting for postgres..."
+            sleep 2
+          done
+          echo "✅ Postgres is ready"
         
       - name: Test (unit)
         run: pnpm test
         continue-on-error: true # If you want test failure not to prevent deployment, hold
+
+      - name: Run migrations
+        run: pnpm run typeorm:run
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: mylorry
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+
+      - name: Seed database
+        run: pnpm run seed
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: mylorry
+          DB_USER: postgres
+          DB_PASSWORD: postgres
       
       - name: Test (e2e)
         run: pnpm test:e2e
