@@ -13,7 +13,7 @@ name: mylorry
 services:
   # ------------------------- PostgreSQL (Database) -------------------------
   postgres:
-    image: postgres:16-alpine
+    image: timescale/timescaledb:2.15.2-pg16
     environment:
       POSTGRES_DB: ${DB_NAME:-mylorry}
       POSTGRES_USER: ${DB_USER:-postgres}

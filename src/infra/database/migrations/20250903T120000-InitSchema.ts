@@ -188,7 +188,7 @@ export class InitSchema20250903T120000 implements MigrationInterface {
       ALTER TABLE fuel_transactions
       SET (
         timescaledb.compress,
-        timescaledb.compress_segmentby = 'card_id,organization_id',
+        timescaledb.compress_segmentby = 'card_id,organization_id,station_id',
         timescaledb.compress_orderby   = 'occurred_at'
       );
     `);
