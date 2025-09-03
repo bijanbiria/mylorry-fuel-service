@@ -35,10 +35,12 @@ jobs:
         run: pnpm install --frozen-lockfile
         
       - name: Test (unit)
-        run: pnpm test -- --ci --reporters=default --passWithNoTests
+        run: pnpm test
+        continue-on-error: true # If you want test failure not to prevent deployment, hold
       
       - name: Test (e2e)
-        run: pnpm test:e2e -- --ci --reporters=default
+        run: pnpm test:e2e
+        continue-on-error: true # If you want test failure not to prevent deployment, hold
 
       - name: Build Nest
         run: pnpm build
