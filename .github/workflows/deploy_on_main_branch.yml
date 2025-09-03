@@ -33,10 +33,12 @@ jobs:
 
       - name: Install
         run: pnpm install --frozen-lockfile
-
-      - name: Test (All)
-        run: pnpm test:all -- --ci --reporters=default --reporters=jest-junit
-        continue-on-error: true # If you want test failure not to prevent deployment, hold
+        
+      - name: Test (unit)
+        run: pnpm test -- --ci --reporters=default --passWithNoTests
+      
+      - name: Test (e2e)
+        run: pnpm test:e2e -- --ci --reporters=default
 
       - name: Build Nest
         run: pnpm build
