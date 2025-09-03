@@ -1,8 +1,8 @@
 {
   "name": "mylorry-fuel-service",
   "version": "0.0.1",
-  "description": "",
-  "author": "",
+  "description": "MyLorry Fuel Service",
+  "author": "Bijan Biria",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
@@ -17,14 +17,37 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    
+    "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
+    "typeorm:run": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d src/infra/database/data-source.ts",
+    "typeorm:revert": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:revert -d src/infra/database/data-source.ts",
+    "typeorm:show": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:show -d src/infra/database/data-source.ts",
+    "typeorm:create": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:create src/infra/database/migrations/ManualMigration",
+    "typeorm:generate": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate -d src/infra/database/data-source.ts src/infra/database/migrations/AutoMigration"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
+    "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/swagger": "^11.2.0",
+    "@nestjs/terminus": "^11.0.0",
+    "@nestjs/typeorm": "^11.0.0",
+    "cache-manager": "^7.2.0",
+    "cache-manager-redis-yet": "^5.1.5",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "dotenv": "^17.2.2",
+    "ioredis": "^5.7.0",
+    "pg": "^8.16.3",
+    "pino-http": "^10.5.0",
+    "pino-pretty": "^13.1.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "swagger-ui-express": "^5.0.1",
+    "typeorm": "^0.3.26",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -48,6 +71,7 @@
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
+    "typeorm-ts-node-commonjs": "^0.3.20",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
   },
