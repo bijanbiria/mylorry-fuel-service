@@ -35,10 +35,23 @@ function common(): PgBase {
 
 // CLI (migrations): globs are required for TypeORM CLI to discover files
 export function buildCliOptions(): PostgresConnectionOptions {
+  const projectRoot = process.cwd();
+  const here = __dirname; // in dist: <root>/dist/config
+  const distRoot = path.resolve(here, '..'); // <root>/dist
+  const isDist = distRoot.endsWith(`${path.sep}dist`);
+
+  const entities = isDist
+    ? [path.resolve(distRoot, '**/entities/*.entity.js')]
+    : [path.resolve(projectRoot, 'src/**/entities/*.entity.{ts,js}')];
+
+  const migrations = isDist
+    ? [path.resolve(distRoot, 'infra/database/migrations/*.js')]
+    : [path.resolve(projectRoot, 'src/infra/database/migrations/*.{ts,js}')];
+
   return {
     ...common(),
-    entities: [path.resolve(process.cwd(), 'src/**/entities/*.entity.{ts,js}')],
-    migrations: [path.resolve(process.cwd(), 'src/infra/database/migrations/*.{ts,js}')],
+    entities,
+    migrations,
   } as PostgresConnectionOptions;
 }
 
