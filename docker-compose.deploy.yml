@@ -1,0 +1,94 @@
+# docker-compose.yml
+# ------------------------------------------------------------------------------------
+# About the `version` field:
+# Since Docker Compose v1.27.0+, the `version:` key is optional.
+# The Compose Spec is unified and the CLI detects capabilities automatically.
+# More details:
+# https://bijanbiria.com/blog/docker/do-you-still-need-the-version-field-in-docker-compose-2024-update/
+# ------------------------------------------------------------------------------------
+# version: "3.9"  # Intentionally commented; typically not needed anymore.
+
+name: mylorry
+
+services:
+  # ------------------------- PostgreSQL (Database) -------------------------
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-mylorry}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # ------------------------------ Redis (Cache) ----------------------------
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  # --------------------------------- App -----------------------------------
+  app:
+    # Option A: run a published image (GHCR or your registry)
+    image: ghcr.io/${GHCR_OWNER:-your-gh-username}/${GHCR_IMAGE:-mylorry-fuel-service}:latest
+    # Option B: build locally
+    # build: .
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Ensure connectivity via the internal Compose network
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      PORT: ${PORT:-3000}
+    # If testing without Traefik, expose the port directly (usually not needed in prod):
+    # ports:
+    #   - "${PORT:-3000}:3000"
+    networks:
+      - internal
+      - web
+    restart: unless-stopped
+    labels:
+      # Traefik labels (assumes Traefik runs separately on the same `web` network)
+      - "traefik.enable=true"
+      - "traefik.http.routers.mylorry.rule=Host(`${DOMAIN:-mylorry.bijanbiria.com}`)"
+      - "traefik.http.routers.mylorry.entrypoints=websecure"
+      - "traefik.http.routers.mylorry.tls.certresolver=le"
+      - "traefik.http.services.mylorry.loadbalancer.server.port=3000"
+
+# ------------------------------- Networks & Volumes -------------------------------
+networks:
+  # Note: if Traefik runs in a separate stack/compose project,
+  # this network must be created as external: `docker network create web`
+  web:
+    external: true
+  internal:
+    external: false
+
+volumes:
+  pgdata: {}
+  redisdata: {}
