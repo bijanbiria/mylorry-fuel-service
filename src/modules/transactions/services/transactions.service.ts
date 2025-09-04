@@ -36,6 +36,7 @@ export class TransactionsService {
       if (!card) {
         card = await qr.manager.findOne(Card, { where: { last4 } });
       }
+      
       if (!card) {
         await qr.commitTransaction();
         return { kind: 'BAD_REQUEST', code: 'CARD_NOT_FOUND', message: 'Card not found' };
@@ -85,8 +86,8 @@ export class TransactionsService {
       ]);
 
       // Current spent
-      const dailySpent = BigInt(dailyBucket?.spentCents as any);
-      const monthlySpent = BigInt(monthlyBucket?.spentCents as any);
+      const dailySpent = BigInt(dailyBucket?.spentCents ?? '0' as unknown as string);
+      const monthlySpent = BigInt(monthlyBucket?.spentCents ?? '0' as unknown as string);
 
       // Check limits
       if (dailyRule && dailySpent + amount > BigInt(dailyRule.limitCents as any)) {

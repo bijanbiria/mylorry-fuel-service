@@ -6,7 +6,7 @@ import { OrgAccount } from '../modules/organizations/entities/org-account.entity
 import { Card } from '../modules/cards/entities/card.entity';
 import { CardLimitRule } from '../modules/usage/entities/card-limit-rule.entity';
 import { Station } from '../modules/stations/entities/station.entity';
-import { loadEnv } from 'src/config/database.config';
+import * as crypto from 'crypto';
 
 /**
  * Seeds the database with a small coherent dataset.
@@ -44,35 +44,35 @@ export default async function seed(ds?: DataSource): Promise<void> {
   await em.save(acc);
 
 
-  // Card
-  const card1 = em.create(Card, 
-    {
-      organizationId: org1.id,
-      cardNumberHash: 'sha256:demo-hash',
-      last4: '4242',
-      status: 'active',
-    }
-  );
+  // Insert Cards
+  // Card 1
+  const card1Number = '4242424242424242';
+  const card1 = em.create(Card, {
+    organizationId: org1.id,
+    cardNumberHash: hashCardNumber(card1Number),
+    last4: card1Number.slice(-4),
+    status: 'active',
+  });
   await em.save(card1);
 
-  const card2 = em.create(Card, 
-    {
-      organizationId: org2.id,
-      cardNumberHash: 'sha256:demo-hash',
-      last4: '2234',
-      status: 'active',
-    }
-  );
+  // Card 2
+  const card2Number = '5555666677778888';
+  const card2 = em.create(Card, {
+    organizationId: org2.id,
+    cardNumberHash: hashCardNumber(card2Number),
+    last4: card2Number.slice(-4),
+    status: 'active',
+  });
   await em.save(card2);
 
-  const card3 = em.create(Card, 
-    {
-      organizationId: org3.id,
-      cardNumberHash: 'sha256:demo-hash',
-      last4: '5465',
-      status: 'blocked',
-    }
-  );
+  // Card 3
+  const card3Number = '4111111111111234';
+  const card3 = em.create(Card, {
+    organizationId: org3.id,
+    cardNumberHash: hashCardNumber(card3Number),
+    last4: card3Number.slice(-4),
+    status: 'blocked',
+  });
   await em.save(card3);
 
 
@@ -85,27 +85,75 @@ export default async function seed(ds?: DataSource): Promise<void> {
 
 
   // Card daily limit rule
-  await em.save(CardLimitRule, {
-    cardId: card1.id,
-    periodType: 'DAILY',
-    limitCents: '200000', // $2,000.00
-    windowMode: 'CALENDAR',
-  });
-  await em.save(CardLimitRule, {
-    cardId: card2.id,
-    periodType: 'WEEKLY',
-    limitCents: '1400000', // $14,000.00
-    windowMode: 'CALENDAR',
-  });
-  await em.save(CardLimitRule, {
-    cardId: card3.id,
-    periodType: 'MONTHLY',
-    limitCents: '6000000', // $60,000.00
-    windowMode: 'CALENDAR',
-  });
+  await em.save(CardLimitRule, [
+      {
+        cardId: card1.id,
+        periodType: 'DAILY',
+        limitCents: '10000', // $100.00
+        windowMode: 'CALENDAR',
+      },
+      {
+        cardId: card1.id,
+        periodType: 'WEEKLY',
+        limitCents: '70000', // $700.00
+        windowMode: 'CALENDAR',
+      },
+      {
+        cardId: card1.id,
+        periodType: 'MONTHLY',
+        limitCents: '300000', // $3,000.00
+        windowMode: 'CALENDAR',
+      }
+  ]);
+  await em.save(CardLimitRule, [
+      {
+        cardId: card2.id,
+        periodType: 'DAILY',
+        limitCents: '20000', // $200.00
+        windowMode: 'CALENDAR',
+      },
+      {
+        cardId: card2.id,
+        periodType: 'WEEKLY',
+        limitCents: '140000', // $1,400.00
+        windowMode: 'CALENDAR',
+      },
+      {
+        cardId: card2.id,
+        periodType: 'MONTHLY',
+        limitCents: '600000', // $6,000.00
+        windowMode: 'CALENDAR',
+      }
+  ]);
+  await em.save(CardLimitRule, [
+      {
+        cardId: card3.id,
+        periodType: 'DAILY',
+        limitCents: '30000', // $300.00
+        windowMode: 'CALENDAR',
+      },
+      {
+        cardId: card3.id,
+        periodType: 'WEEKLY',
+        limitCents: '210000', // $2,100.00
+        windowMode: 'CALENDAR',
+      },
+      {
+        cardId: card3.id,
+        periodType: 'MONTHLY',
+        limitCents: '900000', // $9,000.00
+        windowMode: 'CALENDAR',
+      }
+  ]);
+
 
   if (initializedHere) {
     await dsInstance.destroy();
   }
 }
+
+function hashCardNumber(cardNumber: string): string {
+  return 'sha256:' + crypto.createHash('sha256').update(cardNumber).digest('hex');
+}
+
 seed();
