@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { DataSource, QueryRunner } from 'typeorm';
+import { Inject, Injectable } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { IncomingTransactionDto } from '../../webhooks/dto/incoming-transaction.dto';
 import { Organization } from '../../organizations/entities/organization.entity';
 import { OrgAccount } from '../../organizations/entities/org-account.entity';
@@ -9,10 +9,16 @@ import { CardUsageBucket } from '../../usage/entities/card-usage-bucket.entity';
 import { FuelTransaction } from '../entities/fuel-transaction.entity';
 import * as crypto from 'crypto';
 import { ProcessResult } from '../../webhooks/services/webhooks.service';
+import { CacheService } from 'src/common/cache/cache.service';
+import { hashCardNumber, last4 } from 'src/common/utils/crypto.util';
+import { CacheKeys } from '../../../common/cache/cache-keys.util';
 
 @Injectable()
 export class TransactionsService {
-  constructor(private ds: DataSource) {}
+  constructor(
+    private ds: DataSource,
+    private cache: CacheService
+  ) {}
 
   /**
    * Executes the fuel transaction end-to-end inside a single DB transaction.
@@ -23,8 +29,8 @@ export class TransactionsService {
     const occurredAt = new Date(dto.occurredAt);
 
     // Derive identifiers from incoming payload
-    const last4 = dto.cardNumber.replace(/\D/g, '').slice(-4);
-    const hash = 'sha256:' + crypto.createHash('sha256').update(dto.cardNumber).digest('hex');
+    const l4 = last4(dto.cardNumber);
+    const hash = hashCardNumber(dto.cardNumber);
 
     const qr = this.ds.createQueryRunner();
     await qr.connect();
@@ -32,18 +38,37 @@ export class TransactionsService {
 
     try {
       // 1) Identify card (prefer hash; fallback to last4 for demo)
-      let card = await qr.manager.findOne(Card, { where: { cardNumberHash: hash } });
+      let card =
+        await this.cache.getOrSetJson<Card | null>(
+          CacheKeys.cardByHash(hash),
+          () => qr.manager.findOne(Card, { where: { cardNumberHash: hash } }),
+          300,
+        );
       if (!card) {
-        card = await qr.manager.findOne(Card, { where: { last4 } });
+        card = await this.cache.getOrSetJson<Card | null>(
+          CacheKeys.cardByLast4(l4),
+          () => qr.manager.findOne(Card, { where: { last4: l4 } }),
+          300,
+        );
+        // اگر با last4 پیدا شد، همان را روی hash هم سیو کن تا دفعات بعد مستقیم از hash بیاد
+        if (card) {
+          await this.cache.setJson(CacheKeys.cardByHash(hash), card, 300);
+        }
       }
       
+
       if (!card) {
         await qr.commitTransaction();
         return { kind: 'BAD_REQUEST', code: 'CARD_NOT_FOUND', message: 'Card not found' };
       }
 
       // Organization & account (FOR UPDATE for balance mutation)
-      const org = await qr.manager.findOneBy(Organization, { id: card.organizationId });
+      const org =
+        await this.cache.getOrSetJson<Organization | null>(
+          CacheKeys.org(card.organizationId),
+          () => qr.manager.findOneBy(Organization, { id: card.organizationId }),
+          300,
+        );
       if (!org) {
         await qr.commitTransaction();
         return { kind: 'BAD_REQUEST', code: 'ORG_NOT_FOUND', message: 'Organization not found' };
@@ -69,7 +94,13 @@ export class TransactionsService {
       }
 
       // 2) Limits: fetch rules (active)
-      const rules = await qr.manager.find(CardLimitRule, { where: { cardId: card.id, active: true } });
+      const rules =
+        await this.cache.getOrSetJson<CardLimitRule[]>(
+          CacheKeys.rules(card.id),
+          () => qr.manager.find(CardLimitRule, { where: { cardId: card.id, active: true } }),
+          300,
+        ) ?? [];
+
       const dailyRule = rules.find((r) => r.periodType === 'DAILY');
       const monthlyRule = rules.find((r) => r.periodType === 'MONTHLY');
 
@@ -79,15 +110,20 @@ export class TransactionsService {
       const monthStart = new Date(Date.UTC(occurredAt.getUTCFullYear(), occurredAt.getUTCMonth(), 1, 0, 0, 0, 0));
       const monthEnd = new Date(Date.UTC(occurredAt.getUTCFullYear(), occurredAt.getUTCMonth() + 1, 1, 0, 0, 0, 0));
 
-      // ---- Usage read WITHOUT creating buckets on failure
       const [dailyBucket, monthlyBucket] = await Promise.all([
-        qr.manager.findOne(CardUsageBucket, { where: { cardId: card.id, periodType: 'DAILY', bucketStart: dayStart, bucketEnd: dayEnd }, lock: { mode: 'pessimistic_read' } }),
-        qr.manager.findOne(CardUsageBucket, { where: { cardId: card.id, periodType: 'MONTHLY', bucketStart: monthStart, bucketEnd: monthEnd }, lock: { mode: 'pessimistic_read' } }),
+        qr.manager.findOne(CardUsageBucket, {
+          where: { cardId: card.id, periodType: 'DAILY', bucketStart: dayStart, bucketEnd: dayEnd },
+          lock: { mode: 'pessimistic_read' },
+        }),
+        qr.manager.findOne(CardUsageBucket, {
+          where: { cardId: card.id, periodType: 'MONTHLY', bucketStart: monthStart, bucketEnd: monthEnd },
+          lock: { mode: 'pessimistic_read' },
+        }),
       ]);
 
       // Current spent
-      const dailySpent = BigInt(dailyBucket?.spentCents ?? '0' as unknown as string);
-      const monthlySpent = BigInt(monthlyBucket?.spentCents ?? '0' as unknown as string);
+      const dailySpent = BigInt(((dailyBucket?.spentCents) ?? '0') as any);
+      const monthlySpent = BigInt(((monthlyBucket?.spentCents) ?? '0') as any);
 
       // Check limits
       if (dailyRule && dailySpent + amount > BigInt(dailyRule.limitCents as any)) {
@@ -106,6 +142,7 @@ export class TransactionsService {
         return { kind: 'REJECTED', code: 'INSUFFICIENT_FUNDS', message: 'Insufficient organization balance' };
       }
 
+      
       // 3) Apply mutations
       account.availableCents = (currentBalance - amount).toString();
       await qr.manager.save(account);
@@ -115,8 +152,8 @@ export class TransactionsService {
       const monthlyToSave = monthlyBucket ?? qr.manager.create(CardUsageBucket, {
         cardId: card.id, periodType: 'MONTHLY', bucketStart: monthStart, bucketEnd: monthEnd, spentCents: '0',
       });
-      dailyToSave.spentCents = (BigInt(dailyToSave.spentCents as any) + amount).toString();
-      monthlyToSave.spentCents = (BigInt(monthlyToSave.spentCents as any) + amount).toString();
+      dailyToSave.spentCents = (BigInt(dailyToSave?.spentCents ?? '0' as unknown as string) + amount).toString();
+      monthlyToSave.spentCents = (BigInt(monthlyToSave?.spentCents ?? '0' as unknown as string) + amount).toString();
       await qr.manager.save([dailyToSave, monthlyToSave]);
 
 

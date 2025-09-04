@@ -6,7 +6,7 @@ import { OrgAccount } from '../modules/organizations/entities/org-account.entity
 import { Card } from '../modules/cards/entities/card.entity';
 import { CardLimitRule } from '../modules/usage/entities/card-limit-rule.entity';
 import { Station } from '../modules/stations/entities/station.entity';
-import * as crypto from 'crypto';
+import { hashCardNumber, last4 } from 'src/common/utils/crypto.util';
 
 /**
  * Seeds the database with a small coherent dataset.
@@ -50,7 +50,7 @@ export default async function seed(ds?: DataSource): Promise<void> {
   const card1 = em.create(Card, {
     organizationId: org1.id,
     cardNumberHash: hashCardNumber(card1Number),
-    last4: card1Number.slice(-4),
+    last4: last4(card1Number),
     status: 'active',
   });
   await em.save(card1);
@@ -60,7 +60,7 @@ export default async function seed(ds?: DataSource): Promise<void> {
   const card2 = em.create(Card, {
     organizationId: org2.id,
     cardNumberHash: hashCardNumber(card2Number),
-    last4: card2Number.slice(-4),
+    last4: last4(card2Number),
     status: 'active',
   });
   await em.save(card2);
@@ -70,7 +70,7 @@ export default async function seed(ds?: DataSource): Promise<void> {
   const card3 = em.create(Card, {
     organizationId: org3.id,
     cardNumberHash: hashCardNumber(card3Number),
-    last4: card3Number.slice(-4),
+    last4: last4(card3Number),
     status: 'blocked',
   });
   await em.save(card3);
@@ -150,10 +150,6 @@ export default async function seed(ds?: DataSource): Promise<void> {
   if (initializedHere) {
     await dsInstance.destroy();
   }
-}
-
-function hashCardNumber(cardNumber: string): string {
-  return 'sha256:' + crypto.createHash('sha256').update(cardNumber).digest('hex');
 }
 
 seed();

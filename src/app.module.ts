@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './infra/database/database.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
+import { CacheModule } from './common/cache/cache.module';
 
 /**
  * AppModule
@@ -15,6 +16,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
+    CacheModule,
     WebhooksModule,
   ],
   controllers: [AppController],

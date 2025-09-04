@@ -4,6 +4,8 @@ import { IncomingTransactionDto } from '../dto/incoming-transaction.dto';
 import { WebhookEvent } from '../entities/webhook-event.entity';
 import { TransactionsService } from '../../transactions/services/transactions.service';
 import { Station } from '../../stations/entities/station.entity';
+import { CacheService } from 'src/common/cache/cache.service';
+import { CacheKeys } from '../../../common/cache/cache-keys.util';
 
 export type ProcessResult =
   | { kind: 'DUPLICATE' }
@@ -13,7 +15,11 @@ export type ProcessResult =
 
 @Injectable()
 export class WebhooksService {
-  constructor(private ds: DataSource, private txSvc: TransactionsService) { }
+  constructor(
+    private ds: DataSource, 
+    private txSvc: TransactionsService,
+    private cache: CacheService,
+  ) { }
 
   /**
    * Idempotency + routing to domain service. Never throws; returns a discriminated union
@@ -23,7 +29,11 @@ export class WebhooksService {
     const em = this.ds.manager;
 
     // Resolve/create station (for demo). In production, validate provisioned stations instead.
-    let station = await em.findOneBy(Station, { code: dto.stationCode });
+    let station = await this.cache.getOrSetJson(
+      CacheKeys.stationByCode(dto.stationCode),
+      () => em.findOneBy(Station, { code: dto.stationCode }),
+      600,
+    );
     if (!station) {
       // for stricter behavior return BAD_REQUEST instead of auto-creating
       station = await em.save(Station, { code: dto.stationCode, name: dto.stationCode });
