@@ -216,6 +216,53 @@ Tests include:
 
 ---
 
+## Assumptions & Reasoning
+
+This project was implemented as part of an assessment, and several assumptions and design choices were made for clarity and scope:
+
+- **Station provisioning:**  
+  Stations (`Station` entity) are auto-created on first webhook.  
+  In production, stations would be pre-provisioned and validated.  
+  Rationale: simplifies demo/testing.
+
+- **Card identification:**  
+  Cards are identified by a SHA-256 hash of the PAN (`cardNumberHash`), with a fallback to `last4` digits for demo.  
+  In production, PANs would never be accepted directly; tokens or issuer-provided identifiers would be required.
+
+- **Idempotency:**  
+  Implemented with per-station + `x-idempotency-key`.  
+  Only *approved* transactions mark an event as processed.  
+  Failed validations mark the event as `failed` and allow retries.  
+  Rationale: ensures petrol stations can safely retry without risk of double posting.
+
+- **Limits & Usage Buckets:**  
+  Daily and monthly usage are implemented with explicit `card_usage_buckets` rows.  
+  Buckets are created/locked within transactions for atomicity.  
+  TimescaleDB hypertables are used for scalability.  
+  Rationale: scales to large volumes of time-series data.
+
+- **Redis Cache:**  
+  Read-through cache is integrated for frequently accessed data (cards, orgs, limits).  
+  If Redis is down, the system gracefully falls back to DB lookups.  
+  Rationale: avoids hard dependency on cache for correctness.
+
+- **Business rules not in scope (yet):**  
+  - Authentication/authorization of webhook callers.  
+  - Rate limiting, fraud detection, and monitoring.  
+  - Reconciliation and reporting pipelines.  
+  These are out of scope for this assessment but would be required in production.
+
+- **Error handling:**  
+  Responses are wrapped in `{ data, message, error }` consistently.  
+  Business validation errors return **422**, duplicates return **409**, invalid payloads return **400**.  
+  Rationale: provides predictable API contract.
+
+- **CI/CD:**  
+  GitHub Actions workflow spins up ephemeral Postgres/TimescaleDB and runs migrations + seed before e2e tests.  
+  Rationale: ensures tests run against a clean environment.
+
+---
+
 ## Flow Diagram
 ```mermaid
 sequenceDiagram
