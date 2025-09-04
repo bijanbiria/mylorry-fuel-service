@@ -21,8 +21,8 @@
         "parameters": [
           {
             "name": "x-idempotency-key",
-            "required": false,
             "in": "header",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -40,17 +40,129 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "Approved",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TransactionResponseDto"
+                  "example": {
+                    "data": {
+                      "status": "approved",
+                      "transactionId": "d3c1f9b6-2f2a-42a9-9f0f-1f91a6f7465d"
+                    },
+                    "message": "Approved",
+                    "error": null
+                  }
                 }
               }
             }
           },
           "400": {
-            "description": "Validation error"
+            "description": "Invalid station/card/currency",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "examples": {
+                    "CARD": {
+                      "summary": "Card not found",
+                      "value": {
+                        "data": null,
+                        "message": "Card not found",
+                        "error": {
+                          "code": "CARD_NOT_FOUND"
+                        }
+                      }
+                    },
+                    "ORG": {
+                      "summary": "Organization not found",
+                      "value": {
+                        "data": null,
+                        "message": "Organization not found",
+                        "error": {
+                          "code": "ORG_NOT_FOUND"
+                        }
+                      }
+                    },
+                    "CUR": {
+                      "summary": "Currency mismatch",
+                      "value": {
+                        "data": null,
+                        "message": "Currency mismatch",
+                        "error": {
+                          "code": "CURRENCY_MISMATCH"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate webhook (idempotency key)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "data": null,
+                    "message": "Duplicate webhook (idempotency key)",
+                    "error": {
+                      "code": "DUPLICATE"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "examples": {
+                    "DAILY": {
+                      "summary": "Daily limit exceeded",
+                      "value": {
+                        "data": null,
+                        "message": "Daily limit exceeded",
+                        "error": {
+                          "code": "DAILY_LIMIT_EXCEEDED"
+                        }
+                      }
+                    },
+                    "MONTHLY": {
+                      "summary": "Monthly limit exceeded",
+                      "value": {
+                        "data": null,
+                        "message": "Monthly limit exceeded",
+                        "error": {
+                          "code": "MONTHLY_LIMIT_EXCEEDED"
+                        }
+                      }
+                    },
+                    "FUNDS": {
+                      "summary": "Insufficient funds",
+                      "value": {
+                        "data": null,
+                        "message": "Insufficient organization balance",
+                        "error": {
+                          "code": "INSUFFICIENT_FUNDS"
+                        }
+                      }
+                    },
+                    "BLOCKED": {
+                      "summary": "Card blocked",
+                      "value": {
+                        "data": null,
+                        "message": "Card is blocked",
+                        "error": {
+                          "code": "CARD_BLOCKED"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "Process incoming fuel transaction",
@@ -115,29 +227,6 @@
           "amountCents",
           "currency",
           "occurredAt"
-        ]
-      },
-      "TransactionResponseDto": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "example": "approved",
-            "description": "Transaction status"
-          },
-          "transactionId": {
-            "type": "string",
-            "example": "d3c1f9b6-2f2a-42a9-9f0f-1f91a6f7465d",
-            "description": "Internal transaction ID (when approved)"
-          },
-          "reason": {
-            "type": "string",
-            "example": "Limit exceeded",
-            "description": "Reason for rejection (if applicable)"
-          }
-        },
-        "required": [
-          "status"
         ]
       }
     }

@@ -5,42 +5,59 @@ import { WebhookEvent } from '../entities/webhook-event.entity';
 import { TransactionsService } from '../../transactions/services/transactions.service';
 import { Station } from '../../stations/entities/station.entity';
 
+export type ProcessResult =
+  | { kind: 'DUPLICATE' }
+  | { kind: 'BAD_REQUEST'; code: 'STATION_INVALID' | 'CARD_NOT_FOUND' | 'ORG_NOT_FOUND' | 'CURRENCY_MISMATCH' | 'INTERNAL_ERROR'; message: string }
+  | { kind: 'REJECTED'; code: 'INSUFFICIENT_FUNDS' | 'DAILY_LIMIT_EXCEEDED' | 'MONTHLY_LIMIT_EXCEEDED' | 'CARD_BLOCKED'; message: string }
+  | { kind: 'APPROVED'; txId: string };
+
 @Injectable()
 export class WebhooksService {
-  constructor(private ds: DataSource, private txSvc: TransactionsService) {}
+  constructor(private ds: DataSource, private txSvc: TransactionsService) { }
 
+  /**
+   * Idempotency + routing to domain service. Never throws; returns a discriminated union
+   * that the controller maps to HTTP codes and the standard envelope.
+   */
   async processIncoming(dto: IncomingTransactionDto, idemKey?: string) {
     const em = this.ds.manager;
 
-    // Resolve/create station (demo-friendly)
+    // Resolve/create station (for demo). In production, validate provisioned stations instead.
     let station = await em.findOneBy(Station, { code: dto.stationCode });
-    if (!station) station = await em.save(Station, { code: dto.stationCode, name: dto.stationCode });
+    if (!station) {
+      // for stricter behavior return BAD_REQUEST instead of auto-creating
+      station = await em.save(Station, { code: dto.stationCode, name: dto.stationCode });
+    }
 
-    // Idempotency check (use IsNull() when no idempotency key is provided)
+    // Idempotency per station
     const where = idemKey
       ? { stationId: station.id, idempotencyKey: idemKey }
       : { stationId: station.id, idempotencyKey: IsNull() };
 
     let event = await em.findOne(WebhookEvent, { where });
-
     if (!event) {
-      event = em.create(WebhookEvent, {
-        stationId: station.id,
-        idempotencyKey: idemKey ?? null,
-        rawPayload: dto,
-        status: 'received',
-      });
-      event = await em.save(event);
+      event = await em.save(
+        em.create(WebhookEvent, {
+          stationId: station.id,
+          idempotencyKey: idemKey ?? null,
+          rawPayload: dto,
+          status: 'received',
+        }),
+      );
     } else if (event.status === 'processed') {
-      // Optional: return cached response if you stored it in meta
-      return { status: 'ok', note: 'duplicate ignored' };
+      // treat duplicate ONLY if a previous run was approved/successfully finalized
+      return { kind: 'DUPLICATE' } as const;
     }
 
-    // Map to internal DTO (typically you’d resolve card/org by hash)
+    // Delegate to domain service for the rules & mutations
     const result = await this.txSvc.execute(dto, station.id);
 
-    // Mark processed
-    await em.update(WebhookEvent, { id: event.id }, { status: 'processed', processedAt: new Date() });
+    // Mark outcome: only APPROVED -> processed, otherwise -> failed (allows retry without 409)
+    if (result.kind === 'APPROVED') {
+      await em.update(WebhookEvent, { id: event.id }, { status: 'processed', processedAt: new Date(), errorMessage: null });
+    } else {
+      await em.update(WebhookEvent, { id: event.id }, { status: 'failed', processedAt: new Date(), errorMessage: result.kind === 'BAD_REQUEST' || result.kind === 'REJECTED' ? result.code : 'UNKNOWN' });
+    }
 
     return result;
   }

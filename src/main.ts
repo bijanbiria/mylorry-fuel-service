@@ -17,9 +17,16 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
 import * as fs from 'fs';
 import * as path from 'path';
+import { ApiEnvelopeInterceptor } from './common/interceptors/api-envelope.interceptor';
+import { HttpExceptionEnvelopeFilter } from './common/filters/http-exception-envelope.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  
+  // Global interceptors/filters/pipes
+  app.useGlobalInterceptors(new ApiEnvelopeInterceptor());
+  // Global filter to ensure all errors are in the envelope format
+  app.useGlobalFilters(new HttpExceptionEnvelopeFilter());
   // Base path for all HTTP routes (e.g., GET /api/v1/health)
   app.setGlobalPrefix('api/v1');
 

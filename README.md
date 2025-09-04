@@ -1,98 +1,154 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# MyLorry Fuel Service
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A NestJS service that ingests fuel station webhooks and records card-based fuel transactions. It uses PostgreSQL via TypeORM, with optional TimescaleDB for time-series optimization, and Redis for caching.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Stack
 
-## Description
+- NestJS, TypeScript
+- TypeORM (PostgreSQL)
+- Redis (cache)
+- OpenAPI + Scalar UI for API docs
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## API
 
-## Project setup
+- Global prefix: `api/v1` (see `src/main.ts:1`).
+- Docs: JSON at `/openapi.json` and Scalar UI at `/docs`.
 
-```bash
-$ pnpm install
+- POST `/api/v1/webhooks/transactions` (`src/modules/webhooks/controllers/webhooks.controller.ts:1`)
+  - Header: `x-idempotency-key` (optional; per-station dedupe)
+  - Body (IncomingTransactionDto):
+    - `stationCode` string
+    - `cardNumber` string
+    - `amountCents` numeric string (minor units)
+    - `currency` 3-letter code
+    - `occurredAt` ISO-8601 datetime
+    - `externalRef` string (optional)
+  - Response (TransactionResponseDto): `{ status: 'approved' | 'rejected', transactionId?, reason? }`
+
+- GET `/` (under the prefix → `/api/v1/`) returns a friendly message.
+
+## Getting Started
+
+1) Install dependencies
+
+Use your preferred package manager (npm shown):
+
+```
+npm install
 ```
 
-## Compile and run the project
+2) Configure environment
 
-```bash
-# development
-$ pnpm run start
+Copy `.env.example` to `.env` and adjust values:
 
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+```
+PORT=3000
+NODE_ENV=development
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=mylorry
+DB_USER=postgres
+DB_PASSWORD=postgres
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+SWAGGER_ENABLED=true
 ```
 
-## Run tests
+3) Database
 
-```bash
-# unit tests
-$ pnpm run test
+Runtime config uses explicit entities (`src/infra/database/database.module.ts:1`).
+TypeORM CLI uses `src/infra/database/data-source.ts:1`.
 
-# e2e tests
-$ pnpm run test:e2e
+- Run migrations:
 
-# test coverage
-$ pnpm run test:cov
+```
+npm run typeorm:run
 ```
 
-## Deployment
+- Revert last migration:
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+```
+npm run typeorm:revert
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+- Generate a migration from changes:
 
-## Resources
+```
+npm run typeorm:generate
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+4) Start the app
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```
+npm run start:dev
+```
 
-## Support
+Then visit `http://localhost:3000/docs` and `http://localhost:3000/openapi.json`.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Docker
 
-## Stay in touch
+- Local compose (`docker-compose.yml`) provides Postgres, Redis, and the app.
+- Traefik support via labels on service `app` (uses external network `web`).
+- Build/run production image with the provided `Dockerfile` (multi-stage; pnpm inside the container).
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Quick start (dev):
 
-## License
+```
+docker compose up -d
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Deploy example:
+
+```
+docker compose -f docker-compose.deploy.yml up -d
+```
+
+If Traefik runs separately, create the external network first:
+
+```
+docker network create web
+```
+
+## Testing
+
+- Unit tests:
+
+```
+npm test
+```
+
+- E2E tests:
+
+```
+npm run test:e2e
+```
+
+Included e2e tests:
+- `test/app.e2e-spec.ts:1` – root route response
+- `test/webhooks.e2e-spec.ts:1` – POST /api/v1/webhooks/transactions (service stubbed)
+
+## Entities (selected)
+
+- `src/modules/transactions/entities/fuel-transaction.entity.ts:1` – composite PK `(id, occurred_at)`; relations to Card/Organization/Station.
+- `src/modules/cards/entities/card.entity.ts:1` – card with org relation, last4, status.
+- `src/modules/organizations/entities/{organization,org-account}.entity.ts:1` – org and 1:1 account with balances in minor units.
+- `src/modules/usage/entities/{card-limit-rule,card-usage-bucket}.entity.ts:1` – spending limits and rolling buckets.
+- Monetary values are stored as `bigint` in DB and exposed as `string` in TypeScript.
+
+## Scripts
+
+- `start`, `start:dev`, `build`, `lint`
+- `test`, `test:e2e`, `test:cov`
+- `typeorm:run`, `typeorm:revert`, `typeorm:show`, `typeorm:generate`
+- `seed` – runs `scripts/seed.ts` if present
+
+## Notes
+
+- Global prefix is set in `src/main.ts:1` to `api/v1`.
+- OpenAPI spec is generated at startup and served at `/openapi.json`; Scalar UI at `/docs`.
+- `src/config/database.config.ts:1` centralizes DB options for runtime and CLI.
+
+---
+
+© 2024 MyLorry Fuel Service.
