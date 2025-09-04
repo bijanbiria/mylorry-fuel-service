@@ -3,24 +3,23 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { WebhooksController } from '../src/modules/webhooks/controllers/webhooks.controller';
 import { WebhooksService } from '../src/modules/webhooks/services/webhooks.service';
+import { ApiEnvelopeInterceptor } from '../src/common/interceptors/api-envelope.interceptor';
 
 describe('WebhooksController (e2e)', () => {
   let app: INestApplication;
 
-  const stubResponse = { status: 'approved', transactionId: 'test-tx-123' };
   const mockedService = {
-    processIncoming: jest.fn().mockResolvedValue(stubResponse),
+    processIncoming: jest.fn().mockResolvedValue({ kind: 'APPROVED', txId: 'test-tx-123' }),
   } as unknown as WebhooksService;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [WebhooksController],
-      providers: [
-        { provide: WebhooksService, useValue: mockedService },
-      ],
+      providers: [{ provide: WebhooksService, useValue: mockedService }],
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalInterceptors(new ApiEnvelopeInterceptor());
     app.setGlobalPrefix('api/v1');
     await app.init();
   });
@@ -44,11 +43,12 @@ describe('WebhooksController (e2e)', () => {
       .set('x-idempotency-key', 'abc-123')
       .send(payload)
       .expect(200)
-      .expect(stubResponse);
+      .expect({
+        data: { status: 'approved', transactionId: 'test-tx-123' },
+        message: 'Approved',
+        error: null,
+      });
 
-    expect(mockedService.processIncoming).toHaveBeenCalledWith(
-      expect.objectContaining(payload),
-      'abc-123',
-    );
+    expect(mockedService.processIncoming).toHaveBeenCalledWith(expect.objectContaining(payload), 'abc-123');
   });
 });
