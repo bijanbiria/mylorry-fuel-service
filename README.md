@@ -223,41 +223,37 @@ sequenceDiagram
   participant ST as Petrol Station
   participant API as MyLorry API (NestJS)
   participant EVT as Webhook Events (idempotency)
-  participant SVC as TransactionsService (domain)
+  participant SVC as TransactionsService
   participant DB as Postgres/Timescale
-  participant REDIS as Redis (optional cache)
+  participant CACHE as Redis (cache)
 
-  ST->>API: POST /api/v1/webhooks/transactions (JSON + x-idempotency-key)
-  API->>EVT: find/create webhook_event (station_id, idem_key)
-  alt event.status == processed
-    API-->>ST: 409 { data:null, message:"Duplicate webhook (idempotency key)", error:{code:"DUPLICATE"} }
-  else first-time OR previous failed
-    API->>SVC: validate DTO + forward
-    note over API,SVC: Envelope handled by global interceptor/filters
+  ST->>API: POST /api/v1/webhooks/transactions + x-idempotency-key
+  API->>EVT: find/create webhook_event (station_id, key)
 
-    par (optional cache)
-      SVC->>REDIS: GET card/org by hash/ids (may miss)
-    and
-      SVC->>DB: Load card, org, account, rules (FOR UPDATE)
+  alt event already processed
+    API-->>ST: 409 Conflict - duplicate idempotency key
+  else first-time or previous failed
+    API->>SVC: validate DTO and process
+
+    par cache lookup
+      SVC->>CACHE: GET card/org (may miss)
+    and DB read/write
+      SVC->>DB: load card/org/account/rules (FOR UPDATE)
     end
 
-    alt Bad request (card/org/currency invalid)
-      SVC-->>API: { kind:"BAD_REQUEST", code, message }
-      API->>EVT: update status = failed, processed_at = now, error_message = code
-      API-->>ST: 400 { data:null, message, error:{code} }
-
-    else Business rule fail (limits/funds/blocked)
-      SVC-->>API: { kind:"REJECTED", code, message }
-      API->>EVT: update status = failed, processed_at = now, error_message = code
-      note over SVC,DB: No fuel_transactions insert; no bucket creation/update
-      API-->>ST: 422 { data:null, message, error:{code} }
-
-    else Approved
-      SVC->>DB: Deduct org_account.balance (FOR UPDATE)
-      SVC->>DB: Upsert/lock DAILY & MONTHLY usage buckets; increment spent
-      SVC->>DB: Insert fuel_transaction(status=approved)
-      API->>EVT: update status = processed, processed_at = now
-      API-->>ST: 200 { data:{status:"approved", transactionId}, message:"Approved", error:null }
+    alt bad request (card/org/currency invalid)
+      SVC-->>API: BAD_REQUEST(code, message)
+      API->>EVT: status=failed, processed_at=now, error=code
+      API-->>ST: 400 Bad Request
+    else business rule failed (limits/funds/blocked)
+      SVC-->>API: REJECTED(code, message)
+      API->>EVT: status=failed, processed_at=now, error=code
+      note over SVC,DB: No tx insert, no bucket write
+      API-->>ST: 422 Unprocessable Entity
+    else approved
+      SVC-->>DB: deduct balance, upsert DAILY and MONTHLY buckets, insert approved tx
+      API-->>EVT: status=processed, processed_at=now
+      API-->>ST: 200 OK
     end
   end
 ```
@@ -265,29 +261,27 @@ sequenceDiagram
 ## System Architecture
 ```mermaid
 flowchart LR
-  %% High-level container diagram for MyLorry
-
   subgraph Internet
-    ST[Petrol Station<br/>Webhook Client]
-    Dev[Developer / API Consumer]
+    ST[Petrol Station Webhook Client]
+    DEV[Developer / API Consumer]
   end
 
-  subgraph Server["Ubuntu Host (srv)"]
+  subgraph Server["Ubuntu Host"]
     subgraph Docker["Docker / Compose Network"]
-      TR[Traefik<br/>(Reverse Proxy, TLS, ACME)]
-      APP[MyLorry API<br/>(NestJS)]
-      DOCS[API Docs<br/>(Scalar UI)]
-      SEED[mylorry-seed<br/>(Migration/Seed Job)]
-      REDIS[(Redis)]
-      PG[(Postgres 16<br/>+ TimescaleDB)]
+      TR[Traefik 'Reverse Proxy, TLS']
+      APP[MyLorry API 'NestJS']
+      DOCS[API Docs 'Scalar UI']
+      SEED[Seed and Migration Job]
+      REDIS['Redis']
+      PG['Postgres 16 + TimescaleDB']
     end
   end
 
   subgraph CI["GitHub Actions (CI/CD)"]
-    CI_Build[Build & Test]
-    CI_Push[Build Image & Push<br/>to GHCR]
-    CI_Deploy[SSH Deploy<br/>docker compose up]
-    GHCR[(GHCR<br/>Container Registry)]
+    BUILD[Build &amp; Test]
+    PUSH[Build Image &amp; Push to GHCR]
+    DEPLOY[SSH Deploy: docker compose up]
+    GHCR[(GHCR Registry)]
   end
 
   %% Traffic
@@ -322,18 +316,18 @@ flowchart LR
 ```mermaid
 flowchart TD
   ST[Petrol Station] -->|Webhook JSON + x-idempotency-key| TR[Traefik]
-  TR --> APP[MyLorry API (NestJS)]
+  TR --> APP[MyLorry API 'NestJS']
 
   APP -->|Validate DTO / Idempotency check| APP
-  APP -->|Load Card/Org/Rules (FOR UPDATE)| PG[(Postgres/TimescaleDB)]
+  APP -->|Load Card/Org/Rules 'FOR UPDATE'| PG['Postgres/TimescaleDB']
   APP -->|Compute daily/monthly buckets| PG
   APP -->|On success: insert approved tx + update usage + deduct balance| PG
   APP -->|On failure: NO tx insert, NO bucket write| PG
-  APP -->|Envelope {data,message,error} + HTTP 200/400/409/422| TR
+  APP -->|Envelope 'data,message,error' + HTTP 200/400/409/422| TR
   TR --> ST
 
   subgraph Background
-    SEED[mylorry-seed (run-migrations, run-seed)]
+    SEED[mylorry-seed 'run-migrations, run-seed']
   end
   SEED --> PG
 ```
